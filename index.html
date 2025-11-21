@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Visionary: AI Art Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0f0f13;
+            color: #e4e4e7;
+            font-family: 'Space Grotesk', sans-serif;
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+        }
+
+        .gradient-text {
+            background: linear-gradient(to right, #c084fc, #6366f1);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #FFF;
+            border-radius: 50%;
+            display: inline-block;
+            position: relative;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+        .loader::after {
+            content: '';  
+            box-sizing: border-box;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            border-bottom-color: #818cf8;
+        }
+        
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .image-container {
+            aspect-ratio: 1 / 1;
+            width: 100%;
+            max-width: 512px;
+            background-color: #18181b;
+            border-radius: 1rem;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 40px rgba(99, 102, 241, 0.1);
+        }
+
+        .image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .image-container img.loaded {
+            opacity: 1;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            padding: 0.75rem 2rem;
+            border-radius: 9999px;
+            font-weight: bold;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        /* Score Circle */
+        .score-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: #1f1f25;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            border: 4px solid #4f46e5;
+            box-shadow: 0 0 20px rgba(79, 70, 229, 0.4);
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="flex flex-col items-center p-4 md:p-8">
+
+    <!-- Header -->
+    <header class="w-full max-w-2xl flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold tracking-tighter">
+            <span class="gradient-text">VISIONARY</span>
+        </h1>
+        <div class="text-sm text-gray-400 bg-gray-900 px-3 py-1 rounded-full border border-gray-800">
+            Round <span id="roundCount">1</span>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="w-full max-w-2xl glass-panel p-6 flex flex-col items-center gap-6">
+        
+        <!-- Image Display -->
+        <div class="image-container">
+            <div id="loadingSpinner" class="hidden flex-col items-center gap-4">
+                <span class="loader"></span>
+                <p class="text-sm text-gray-400 animate-pulse" id="loadingText">Dreaming up an image...</p>
+            </div>
+            <div id="placeholder" class="text-gray-600 text-center px-4">
+                <p class="text-4xl mb-2">🎨</p>
+                <p>Click "Generate" to start</p>
+            </div>
+            <img id="gameImage" alt="AI Generated Art">
+        </div>
+
+        <!-- Gameplay Controls -->
+        <div id="gameControls" class="w-full flex flex-col gap-4">
+            
+            <!-- Step 1: Generate -->
+            <div id="stepGenerate" class="w-full text-center">
+                <button id="generateBtn" class="btn text-lg px-8">Generate Image</button>
+            </div>
+
+            <!-- Step 2: Describe (Hidden initially) -->
+            <div id="stepDescribe" class="w-full hidden flex-col gap-3">
+                <label class="text-sm text-gray-400 ml-1">Describe this image in one sentence:</label>
+                <textarea id="userDescription" rows="2" 
+                    class="w-full bg-black/30 border border-gray-700 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                    placeholder="e.g. A futuristic city floating in the clouds..."></textarea>
+                <button id="submitBtn" class="btn w-full">Submit Description</button>
+            </div>
+
+            <!-- Step 3: Result (Hidden initially) -->
+            <div id="stepResult" class="w-full hidden flex-col items-center gap-6 animate-fade-in">
+                <div class="w-full border-t border-gray-800 my-2"></div>
+                
+                <div class="flex flex-row items-center justify-between w-full gap-6">
+                    <div class="score-circle" id="scoreDisplay">--</div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold text-indigo-400 mb-1">AI Critique</h3>
+                        <p id="aiFeedback" class="text-gray-300 text-sm leading-relaxed italic">"Waiting for feedback..."</p>
+                    </div>
+                </div>
+
+                <div class="w-full bg-gray-900/50 p-4 rounded-lg border border-gray-800">
+                    <p class="text-xs text-gray-500 uppercase font-bold mb-1">The Secret Prompt Was:</p>
+                    <p id="revealPrompt" class="text-indigo-300 font-medium">--</p>
+                </div>
+
+                <button id="nextRoundBtn" class="btn bg-gray-800 hover:bg-gray-700 w-full">Next Round</button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-8 bg-red-500 text-white px-6 py-3 rounded-lg shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        Error message here
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const apiKey = "AIzaSyC2jySuDNbGyMfXpqTnGpOwy1jnKZqE-OE"; 
+        
+        // Prompts for the AI to generate images from.
+        const promptLibrary = [
+            "A cute octopus barista making coffee in a cozy underwater cafe, warm lighting",
+            "A futuristic cyberpunk street food vendor selling glowing noodles in the rain",
+            "A majestic castle made entirely of clouds floating in a golden sunset sky",
+            "A tiny hamster wearing medieval knight armor holding a toothpick sword",
+            "A vintage steampunk robot playing a violin in an abandoned greenhouse",
+            "An astronaut meditating on a floating rock in deep space, colorful nebula background",
+            "A dragon made of stained glass, sunlight shining through it",
+            "A house inside a giant glass bottle floating on the ocean",
+            "A capybara soaking in a hot spring with oranges on its head, snowy mountains background",
+            "A library where the books are flying like birds",
+            "A raccoon detective looking at clues with a magnifying glass in a noir city",
+            "A tree with leaves made of glowing crystals in a dark forest"
+        ];
+
+        // --- State ---
+        let currentPrompt = "";
+        let round = 1;
+        let isGenerating = false;
+
+        // --- Elements ---
+        const generateBtn = document.getElementById('generateBtn');
+        const submitBtn = document.getElementById('submitBtn');
+        const nextRoundBtn = document.getElementById('nextRoundBtn');
+        const userDescription = document.getElementById('userDescription');
+        const gameImage = document.getElementById('gameImage');
+        const placeholder = document.getElementById('placeholder');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const loadingText = document.getElementById('loadingText');
+        
+        const stepGenerate = document.getElementById('stepGenerate');
+        const stepDescribe = document.getElementById('stepDescribe');
+        const stepResult = document.getElementById('stepResult');
+        
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const aiFeedback = document.getElementById('aiFeedback');
+        const revealPrompt = document.getElementById('revealPrompt');
+        const roundCount = document.getElementById('roundCount');
+
+        // --- Core Functions ---
+
+        async function generateImage() {
+            if (isGenerating) return;
+            isGenerating = true;
+            
+            // UI Update
+            stepGenerate.classList.add('hidden');
+            placeholder.classList.add('hidden');
+            gameImage.classList.remove('loaded'); // Hide old image
+            loadingSpinner.classList.remove('hidden');
+            loadingSpinner.classList.add('flex');
+            loadingText.innerText = "Dreaming up a masterpiece...";
+
+            // Pick Random Prompt
+            currentPrompt = promptLibrary[Math.floor(Math.random() * promptLibrary.length)];
+            console.log("Prompt:", currentPrompt);
+
+            try {
+                const imageUrl = await callImagen(currentPrompt);
+                
+                // Preload image
+                gameImage.src = imageUrl;
+                gameImage.onload = () => {
+                    loadingSpinner.classList.add('hidden');
+                    loadingSpinner.classList.remove('flex');
+                    gameImage.classList.add('loaded');
+                    
+                    // Show Input
+                    stepDescribe.classList.remove('hidden');
+                    stepDescribe.classList.add('flex');
+                    userDescription.value = '';
+                    userDescription.focus();
+                    isGenerating = false;
+                };
+            } catch (error) {
+                console.error("Generation Error:", error);
+                showToast("Failed to generate image. Check console for details.");
+                resetRoundUI();
+                isGenerating = false;
+            }
+        }
+
+        async function submitGuess() {
+            const userText = userDescription.value.trim();
+            if (!userText) {
+                showToast("Please write a description first!");
+                return;
+            }
+
+            // UI Update
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Judging...";
+
+            try {
+                const evaluation = await evaluateDescription(currentPrompt, userText);
+                
+                // Display Results
+                scoreDisplay.innerText = evaluation.score;
+                aiFeedback.innerText = `"${evaluation.feedback}"`;
+                revealPrompt.innerText = currentPrompt;
+                
+                // Color code score
+                scoreDisplay.style.borderColor = evaluation.score > 70 ? '#22c55e' : (evaluation.score > 40 ? '#facc15' : '#ef4444');
+
+                stepDescribe.classList.add('hidden');
+                stepResult.classList.remove('hidden');
+                stepResult.classList.add('flex');
+
+            } catch (error) {
+                console.error("Judgment Error:", error);
+                showToast("Judgment failed. Check API Key.");
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Submit Description";
+            }
+        }
+
+        function nextRound() {
+            round++;
+            roundCount.innerText = round;
+            resetRoundUI();
+        }
+
+        function resetRoundUI() {
+            stepResult.classList.add('hidden');
+            stepDescribe.classList.add('hidden');
+            stepGenerate.classList.remove('hidden');
+            placeholder.classList.remove('hidden');
+            gameImage.classList.remove('loaded');
+            gameImage.src = '';
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Submit Description";
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // --- API Calls ---
+
+        async function callImagen(prompt) {
+            // UPDATED: Using imagen-4.0-generate-001 which is required for the preview environment
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+            const payload = {
+                instances: [{ prompt: prompt }],
+                parameters: { sampleCount: 1, aspectRatio: "1:1" }
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Imagen Error: ${response.status} - ${errorText}`);
+            }
+            
+            const data = await response.json();
+            
+            // Handle cases where predictions might be missing
+            if (!data.predictions || !data.predictions[0] || !data.predictions[0].bytesBase64Encoded) {
+                throw new Error("Invalid response format from Imagen API");
+            }
+
+            const base64Image = data.predictions[0].bytesBase64Encoded;
+            return `data:image/png;base64,${base64Image}`;
+        }
+
+        async function evaluateDescription(originalPrompt, userDesc) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const systemPrompt = `
+                You are a witty art critic game judge. 
+                Compare the USER_DESCRIPTION to the ORIGINAL_PROMPT.
+                Rate accuracy and creativity on a scale of 0-100.
+                Provide a short, witty 1-sentence comment on their guess.
+                Return valid JSON: { "score": number, "feedback": "string" }
+            `;
+
+            const userPrompt = `ORIGINAL_PROMPT: ${originalPrompt}\nUSER_DESCRIPTION: ${userDesc}`;
+
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: { responseMimeType: "application/json" }
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Gemini Error: ${response.status} - ${errorText}`);
+            }
+            
+            const data = await response.json();
+            const text = data.candidates[0].content.parts[0].text;
+            return JSON.parse(text);
+        }
+
+        // --- Listeners ---
+        generateBtn.addEventListener('click', generateImage);
+        submitBtn.addEventListener('click', submitGuess);
+        nextRoundBtn.addEventListener('click', nextRound);
+
+    </script>
+</body>
+</html>index.html
